@@ -22,13 +22,13 @@ int main ( int argc,char **argv ) {
 	unsigned char *data=new unsigned char[  Camera.getImageTypeSize ( raspicam::RASPICAM_FORMAT_RGB )];
 	//extract the image in rgb format
 	Camera.retrieve ( data,raspicam::RASPICAM_FORMAT_RGB );//get camera image
-	//save
+        //save
 	std::ofstream outFile ( "raspicam_image.ppm",std::ios::binary );
-  // append PPM metadata
+        // append PPM metadata
 	outFile<<"P6\n"<<Camera.getWidth() <<" "<<Camera.getHeight() <<" 255\n";
 	outFile.write ( ( char* ) data, Camera.getImageTypeSize ( raspicam::RASPICAM_FORMAT_RGB ) );
 	cout<<"Image saved at raspicam_image.ppm"<<endl;
-	//free resrources
+	//free resources
 	delete data;
 	return 0;
 }
