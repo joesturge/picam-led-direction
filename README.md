@@ -24,8 +24,15 @@ sudo ldconfig
 Test program build
 
 ```
-g++ -fpermissive -Wall -IGPIOClass/ GPIOClass/GPIOClass.cpp GPIOClassTest.cpp -o outBin
-sudo ./outBin
+make testgpio
+sudo ./testGPIO
+```
+
+## Main Program Build
+
+```
+make teststill
+sudo ./testStill
 ```
 
 
