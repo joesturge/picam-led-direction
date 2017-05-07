@@ -1,4 +1,4 @@
-CPPFLAGS=-g -fpermissive -Wall -IGPIOClass/ GPIOClass/GPIOClass.cpp
+CPPFLAGS=-g -fpermissive -Wall -IGPIOClass/ GPIOClass/GPIOClass.cpp -std=c++11
 LDFLAGS=-g
 LDLIBS=-IGPIOClass/
 RASPICAM_OPTS=-I/usr/local/include -lraspicam

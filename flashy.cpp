@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
+#include <string>
 #include <raspicam/raspicam.h>
 #include "GPIOClass.h"
 
@@ -18,17 +19,32 @@ void gpioInit(GPIOClass* r, GPIOClass* g, GPIOClass* b) {
 
 void ledPulse(GPIOClass* led) {
 	led->setval_gpio("1");
-	usleep(200000);  // wait for 0.2 seconds
+	usleep(3850);  // wait for 3.85ms seconds
 	led->setval_gpio("0");
 }
 
 void flashGrab(raspicam::RaspiCam* cam, GPIOClass* led) {
 	cout<<"Capturing image"<<endl;
-	led->setval_gpio("1");
-	if (!cam->grab()) {
+
+	if (!cam->grab_dontwait()) {
 		cerr<<"Error grabbing frame"<<endl;
 	}
-	led->setval_gpio("0");
+	ledPulse(led);
+}
+
+void flashRGBGrab(raspicam::RaspiCam* cam, GPIOClass* led1, GPIOClass* led2, GPIOClass* led3) {
+	cout<<"Capturing RGB image"<<endl;
+
+	if (!cam->grab_dontwait()) {
+		cerr<<"Error grabbing frame"<<endl;
+	}
+	usleep(10000);
+	ledPulse(led1);
+	usleep(8970);
+	ledPulse(led2);
+	usleep(8970);
+	ledPulse(led3);
+	usleep(200000); // 50ms
 }
 
 void writeOut(raspicam::RaspiCam* cam, std::string filename, uint filesize) {
@@ -42,13 +58,21 @@ void writeOut(raspicam::RaspiCam* cam, std::string filename, uint filesize) {
 	delete data;
 }
 
+/*void testCB(void* x) {
+	cout<<"Test Callback"<<endl;
+	//return 0;
+}*/
 
 void camInit(raspicam::RaspiCam* Camera) {
 	cout<<"Initing cam"<<endl;
 
 	// override camera settings here
-	Camera->setWidth(320);
-	Camera->setHeight(240);
+	//Camera->setWidth(320);
+	//Camera->setHeight(240);
+	Camera->setShutterSpeed(50000);
+	//Camera->setExposure(raspicam::RASPICAM_EXPOSURE_VERYLONG);
+	//uint tdata = 1;
+	//Camera->setUserCallback(&testCB,(void*)&tdata);
 
 	if ( !Camera->open()) {
 		cerr<<"Error opening camera"<<endl;
@@ -60,12 +84,21 @@ void camInit(raspicam::RaspiCam* Camera) {
 	usleep(100000); // 0.1s
 	Camera->grab();
 	usleep(100000); // 0.1s
+
+	struct timespec start, finish;
+	double elapsed;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	Camera->grab();
+	clock_gettime(CLOCK_MONOTONIC, &finish);
+	elapsed = (finish.tv_sec - start.tv_sec);
+  elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	cout<<"grab timing: "<<elapsed<<endl;
+
 }
 
 
 int main ( int argc,char **argv ) {
 
-  cout<<"Starting"<<endl;
   GPIOClass* rled = new GPIOClass("13");
 	GPIOClass* gled = new GPIOClass("6");
 	GPIOClass* bled = new GPIOClass("19");
@@ -75,14 +108,21 @@ int main ( int argc,char **argv ) {
 
 	uint filesize = Camera->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB );
 
-	flashGrab( Camera, rled );
+	/*flashGrab( Camera, rled );
 	writeOut( Camera, "picam-red.ppm", filesize);
 
 	flashGrab( Camera, gled );
 	writeOut( Camera, "picam-gr.ppm", filesize);
 
 	flashGrab( Camera, bled );
-	writeOut( Camera, "picam-bl.ppm", filesize);
+	writeOut( Camera, "picam-bl.ppm", filesize);*/
+
+	for(uint x = 0; x<=9; x++) {
+		flashRGBGrab( Camera, rled , gled, bled );
+		std::string fn = "picam-rgb"+std::to_string(x)+".ppm";
+		writeOut( Camera, fn, filesize);
+		usleep(50000);
+	}
 
 	cout << "Releasing heap memory and exiting....." << endl;
 	delete gled;
