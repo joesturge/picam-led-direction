@@ -1,6 +1,12 @@
-#custom
-build/
+#ignore binaries
+*
+!*.*
+!/
 
+# other custom
+build/
+*.ppm
+*.jpg
 
 # Compiled Object files
 *.slo
