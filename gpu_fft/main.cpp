@@ -30,15 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <cmath>
 
-#include "gpu_fft/gpu_fft_trans.h"
-#include "gpu_fft/mailbox.h"
+#include "gfft.h"
 #include "main.h"
-
-#define log2_N 9
-#define N (1<<log2_N)
-
-#define GPU_FFT_ROW(fft, io, y) ((fft)->io+(fft)->step*(y))
 
 unsigned Microseconds(void) {
     struct timespec ts;
@@ -46,25 +41,45 @@ unsigned Microseconds(void) {
     return ts.tv_sec*1000000 + ts.tv_nsec/1000;
 }
 
+double* readBMP(char* filename)
+{
+    int i;
+    FILE* f = fopen(filename, "rb");
+    unsigned char info[54];
+    fread(info, sizeof(unsigned char), 54, f); // read the 54-byte header
+
+    // extract image height and width from header
+    int width = *(int*)&info[18];
+    int height = *(int*)&info[22];
+
+    int size = 3 * width * height;
+    unsigned char* data = new unsigned char[size]; // allocate 3 bytes per pixel
+	double* fdata = new double[size];
+    fread(data, sizeof(unsigned char), size, f); // read the rest of the data at once
+    fclose(f);
+
+	for(i=0;i<size;i++) {
+		fdata[i] = (double)data[i]/255;
+	}
+	
+    return fdata;
+}
+
 int main(int argc, char *argv[]) {
-    int x, y, ret, mb = mbox_open();
-    unsigned t[4];
-
-    struct GPU_FFT_COMPLEX *row;
-    struct GPU_FFT_TRANS *trans;
-    struct GPU_FFT *fft_pass[2];
-
-    BITMAPFILEHEADER bfh;
+    
+	BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
+	
+	unsigned N = 512;
 
     // Create Windows bitmap file
-    FILE *fp = fopen("hello_fft_2d.bmp", "wb");
+    FILE *fp = fopen("output.bmp", "wb");
     if (!fp) return -666;
 
     // Write bitmap header
     memset(&bfh, 0, sizeof(bfh));
     bfh.bfType = 0x4D42; //"BM"
-    bfh.bfSize = N*N*3;
+    bfh.bfSize = 512*512*3;
     bfh.bfOffBits = sizeof(bfh) + sizeof(bih);
     fwrite(&bfh, sizeof(bfh), 1, fp);
 
@@ -77,60 +92,29 @@ int main(int argc, char *argv[]) {
     bih.biBitCount = 24;
     bih.biCompression = BI_RGB;
     fwrite(&bih, sizeof(bih), 1, fp);
-
-    // Prepare 1st FFT pass
-    ret = gpu_fft_prepare(mb, log2_N, GPU_FFT_FWD, N, fft_pass+0);
-    if (ret) {
-        return ret;
+	
+	
+    gfft fft(GPU_FFT_FWD, 9);
+	fft.clear();
+	
+	int x, y;
+	
+	for (y=250; y<=266; y++) {
+        for (x=250; x<=266; x++) {
+			fft.input(x,y,1);
+		}
     }
-    // Prepare 2nd FFT pass
-    ret = gpu_fft_prepare(mb, log2_N, GPU_FFT_FWD, N, fft_pass+1);
-    if (ret) {
-        gpu_fft_release(fft_pass[0]);
-        return ret;
-    }
-    // Transpose from 1st pass output to 2nd pass input
-    ret = gpu_fft_trans_prepare(mb, fft_pass[0], fft_pass[1], &trans);
-    if (ret) {
-        gpu_fft_release(fft_pass[0]);
-        gpu_fft_release(fft_pass[1]);
-        return ret;
-    }
-
-    // Clear input array
-    for (y=0; y<N; y++) {
-        row = GPU_FFT_ROW(fft_pass[0], in, y);
-        for (x=0; x<N; x++) row[x].re = row[x].im = 0;
-    }
-
-    // Setup input data
-    GPU_FFT_ROW(fft_pass[0], in,   N/2)[  N/2].re = 255;
-
-    // ==> FFT() ==> T() ==> FFT() ==>
-    usleep(1); /* yield to OS */   t[0] = Microseconds();
-    gpu_fft_execute(fft_pass[0]);  t[1] = Microseconds();
-    gpu_fft_trans_execute(trans);  t[2] = Microseconds();
-    gpu_fft_execute(fft_pass[1]);  t[3] = Microseconds();
+	
+	fft.execute();
 
     // Write output to bmp file
     for (y=0; y<N; y++) {
-        row = GPU_FFT_ROW(fft_pass[1], out, y);
         for (x=0; x<N; x++) {
-            fputc(128+row[x].re, fp); // blue
-            fputc(128+row[x].re, fp); // green
-            fputc(128+row[x].re, fp); // red
+            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // blue
+            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // green
+            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // red
         }
     }
-
-    printf( "1st FFT   %6d usecs\n"
-            "Transpose %6d usecs\n"
-            "2nd FFT   %6d usecs\n",
-            t[3]-t[2], t[2]-t[1], t[1]-t[0]);
-
-    // Clean-up properly.  Videocore memory lost if not freed !
-    gpu_fft_release(fft_pass[0]);
-    gpu_fft_release(fft_pass[1]);
-    gpu_fft_trans_release(trans);
 
     return 0;
 }
