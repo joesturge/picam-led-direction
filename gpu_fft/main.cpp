@@ -96,7 +96,7 @@ std::vector<double> readBMP(std::string filename)
 int main(int argc, char *argv[])
 {
     
-	BITMAPFILEHEADER bfh;
+BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
 	
 	unsigned log2_N = 9;
@@ -124,48 +124,42 @@ int main(int argc, char *argv[])
     fwrite(&bih, sizeof(bih), 1, fp);
 	
 	int x, y;
-	/*
-	//std::vector<double> lena = readBMP("lena.bmp");
+	
+	std::vector<double> lena = readBMP("lena.bmp");
 	
     gfft fft(GPU_FFT_FWD, log2_N);
 	fft.clear();
 	
-	//for(y=0; y<N; y++) {
-	//	for(x=0; x<N; x++) {
-	//		fft.input(x, y, lena.at(y*N + x);
-	//	}
-	//}
-	
-	for (y=250; y<=266; y++) {
-        for (x=250; x<=266; x++) {
-			fft.input(x,y,1);
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			fft.input(x, y, lena.at(y*N + x));
 		}
-    }
+	}
 	
 	fft.execute();
-
-    // Write output to bmp file
-    for (y=0; y<N; y++) {
-        for (x=0; x<N; x++) {
-            fputc(std::abs(fft.outputShift(x,y))/2, fp); // blue
-            fputc(std::abs(fft.outputShift(x,y))/2, fp); // green
-            fputc(std::abs(fft.outputShift(x,y))/2, fp); // red
-        }
-    }
-	*/
 	
-	std::vector<std::vector<std::complex<double> > > sobel = generateSobel(log2_N);
+	std::vector<std::vector<std::complex<double> > > sobel = generateSobel(log2_N, true, false);
+	
+	gfft ifft(GPU_FFT_REV, log2_N);
+	ifft.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			ifft.input(x, y, fft.output(x, y, false)*sobel.at(y).at(x));
+		}
+	}
+	
+	ifft.execute();
 	
 	char pixel;
 	
 	for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
-			pixel = std::abs(sobel.at(y).at(x)) * 30;
+			pixel = (unsigned char) (std::abs(ifft.output(x, y, false))/2);
             fputc(pixel, fp); // blue
             fputc(pixel, fp); // green
             fputc(pixel, fp); // red
         }
     }
-
     return 0;
 }
