@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <cmath>
 #include <iostream>
+#include <complex>
 
 #include "gpu_fft/gpu_fft_trans.h"
 #include "gpu_fft/mailbox.h"
@@ -20,9 +21,9 @@ class gfft
         virtual ~gfft();
 		
 		void input(unsigned x, unsigned y, double value);
+		void input(unsigned x, unsigned y, std::complex<double> value);
 		void execute();
-		GPU_FFT_COMPLEX output(unsigned x, unsigned y);
-		GPU_FFT_COMPLEX outputShift(unsigned x, unsigned y);
+		std::complex<double> output(unsigned x, unsigned y, bool shift);
 		void clear();
     protected:
     private:
@@ -32,5 +33,8 @@ class gfft
 		struct GPU_FFT *fft_pass1;
 		int mailbox;
 };
+
+std::complex<double> toCComplex(GPU_FFT_COMPLEX gpuComplex);
+GPU_FFT_COMPLEX toGComplex(std::complex<double> cComplex);
 
 #endif // GFFT_H

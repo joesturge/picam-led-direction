@@ -26,25 +26,51 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
+#include <cstring>
 #include <unistd.h>
 #include <cmath>
+#include <complex>
+#include <vector>
 
 #include "gfft.h"
 #include "main.h"
 
-unsigned Microseconds(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return ts.tv_sec*1000000 + ts.tv_nsec/1000;
+std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, bool xy=true, bool shift=false)
+{
+	unsigned N = 1<<log2_N;
+	
+	gfft sobel(GPU_FFT_FWD, log2_N);
+	sobel.clear();
+	
+	double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
+	
+	unsigned x, y, i=0;
+	
+	for(y=0; y<3; y++) {
+		for(x=0; x<3; x++) {
+			sobel.input(x, y, filter[xy ? 1:0][i]);
+			i++;
+		}
+	}
+	
+	sobel.execute();
+	
+	std::vector<std::vector<std::complex<double> > > out;
+	for(y=0; y<N; y++) {
+		out.push_back(std::vector<std::complex<double> >());
+		
+		for(x=0; x<N; x++) {
+			out.at(y).push_back(sobel.output(x, y, shift));
+		}
+	}
+	
+	return out;
 }
 
-double* readBMP(char* filename)
+std::vector<double> readBMP(std::string filename)
 {
     int i;
-    FILE* f = fopen(filename, "rb");
+    FILE* f = fopen(filename.c_str(), "rb");
     unsigned char info[54];
     fread(info, sizeof(unsigned char), 54, f); // read the 54-byte header
 
@@ -54,23 +80,27 @@ double* readBMP(char* filename)
 
     int size = 3 * width * height;
     unsigned char* data = new unsigned char[size]; // allocate 3 bytes per pixel
-	double* fdata = new double[size];
+	
     fread(data, sizeof(unsigned char), size, f); // read the rest of the data at once
     fclose(f);
-
+	
+	std::vector<double> fdata;
+	
 	for(i=0;i<size;i++) {
-		fdata[i] = (double)data[i]/255;
+		fdata.push_back((double)data[i]/255);
 	}
 	
     return fdata;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     
 	BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
 	
-	unsigned N = 512;
+	unsigned log2_N = 9;
+	unsigned N = 1<<log2_N;
 
     // Create Windows bitmap file
     FILE *fp = fopen("output.bmp", "wb");
@@ -93,11 +123,18 @@ int main(int argc, char *argv[]) {
     bih.biCompression = BI_RGB;
     fwrite(&bih, sizeof(bih), 1, fp);
 	
+	int x, y;
+	/*
+	//std::vector<double> lena = readBMP("lena.bmp");
 	
-    gfft fft(GPU_FFT_FWD, 9);
+    gfft fft(GPU_FFT_FWD, log2_N);
 	fft.clear();
 	
-	int x, y;
+	//for(y=0; y<N; y++) {
+	//	for(x=0; x<N; x++) {
+	//		fft.input(x, y, lena.at(y*N + x);
+	//	}
+	//}
 	
 	for (y=250; y<=266; y++) {
         for (x=250; x<=266; x++) {
@@ -110,9 +147,23 @@ int main(int argc, char *argv[]) {
     // Write output to bmp file
     for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
-            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // blue
-            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // green
-            fputc(std::sqrt(std::pow(fft.output(x,y).re, 2) + std::pow(fft.output(x,y).im, 2)), fp); // red
+            fputc(std::abs(fft.outputShift(x,y))/2, fp); // blue
+            fputc(std::abs(fft.outputShift(x,y))/2, fp); // green
+            fputc(std::abs(fft.outputShift(x,y))/2, fp); // red
+        }
+    }
+	*/
+	
+	std::vector<std::vector<std::complex<double> > > sobel = generateSobel(log2_N);
+	
+	char pixel;
+	
+	for (y=0; y<N; y++) {
+        for (x=0; x<N; x++) {
+			pixel = std::abs(sobel.at(y).at(x)) * 30;
+            fputc(pixel, fp); // blue
+            fputc(pixel, fp); // green
+            fputc(pixel, fp); // red
         }
     }
 

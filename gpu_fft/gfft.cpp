@@ -47,6 +47,11 @@ void gfft::input(unsigned x, unsigned y, double value)
 	GPU_FFT_ROW(fft_pass0, in, y)[x].re = value;
 }
 
+void gfft::input(unsigned x, unsigned y, std::complex<double> value)
+{
+	GPU_FFT_ROW(fft_pass0, in, y)[x] = toGComplex(value);
+}
+
 void gfft::execute()
 {
     gpu_fft_execute(this->fft_pass0);
@@ -54,14 +59,12 @@ void gfft::execute()
     gpu_fft_execute(this->fft_pass1);
 }
 
-GPU_FFT_COMPLEX gfft::output(unsigned x, unsigned y)
+std::complex<double> gfft::output(unsigned x, unsigned y, bool shift=false)
 {
-	return GPU_FFT_ROW(this->fft_pass1, in, y)[x];
-}
-
-GPU_FFT_COMPLEX gfft::outputShift(unsigned x, unsigned y)
-{
-	return GPU_FFT_ROW(this->fft_pass1, out, y+this->N/2%N)[x+this->N/2%N];
+	if(shift) {
+			return toCComplex(GPU_FFT_ROW(this->fft_pass1, out, (y+this->N/2)%N)[(x+this->N/2)%N]);
+	}
+	return toCComplex(GPU_FFT_ROW(this->fft_pass1, in, y)[x]);
 }
 
 void gfft::clear()
@@ -73,4 +76,17 @@ void gfft::clear()
         row = GPU_FFT_ROW(this->fft_pass0, in, y);
         for (x=0; x<N; x++) row[x].re = row[x].im = 0;
     }
+}
+
+std::complex<double> toCComplex(GPU_FFT_COMPLEX gpuComplex)
+{
+	return std::complex<double>(gpuComplex.re, gpuComplex.im);
+}
+
+GPU_FFT_COMPLEX toGComplex(std::complex<double> cComplex)
+{
+	GPU_FFT_COMPLEX c;
+	c.re = cComplex.real();
+	c.im = cComplex.imag();
+	return c;
 }
