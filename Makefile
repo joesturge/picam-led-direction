@@ -1,19 +1,15 @@
-CPPFLAGS=-g -fpermissive -Wall -IGPIOClass/ GPIOClass/GPIOClass.cpp -std=c++11
+CPPFLAGS=-g -fpermissive -Wall -std=c++11
 LDFLAGS=-g
-LDLIBS=-IGPIOClass/
-RASPICAM_OPTS=-I/usr/local/include -lraspicam
+LDLIBS=-I/usr/local/include -lwiringPi -lraspicam
 
-SRCS=GPIOClass.cpp flashy.cpp
+SRCS=main.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
-testgpio: GPIOClassTest.o
-	$(CXX) $(LDFLAGS) GPIOClassTest.o -o testGPIO $(LDLIBS)# -IGPIOClass/ GPIOClass/GPIOClass.cpp
-
-teststill: flashy.o
-	$(CXX) $(LDFLAGS) flashy.o $(RASPICAM_OPTS) -o testStill $(LDLIBS)# -IGPIOClass GPIOClass/GPIOClass.cpp
+teststill: main.o
+	$(CXX) $(LDFLAGS) main.o -o testStill $(LDLIBS)
 
 %.o: %.cpp
 	$(CXX) -c $(CPPFLAGS) $<
 
 clean:
-	rm *.o testGPIO testStill
+	rm *.o testStill
