@@ -44,11 +44,15 @@ std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, 
 	
 	double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
 	
+	//double filter2d[25] = {-1,-2,0,2,1,-2,-4,0,4,2,0,0,0,0,0,2,4,0,-4,-2,1,2,0,-2,-1};
+	//double filterL[9] = {-1,-1,-1,-1,8,-1,-1,-1,-1};
+	
 	unsigned x, y, i=0;
 	
 	for(y=0; y<3; y++) {
 		for(x=0; x<3; x++) {
 			sobel.input(x, y, filter[xy ? 1:0][i]);
+			//sobel.input(x, y, filterL[i]);
 			i++;
 		}
 	}
@@ -63,6 +67,47 @@ std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, 
 			out.at(y).push_back(sobel.output(x, y, shift));
 		}
 	}
+	
+	return out;
+}
+
+std::vector<std::vector<double> > edge(std::vector<std::vector<double> > in, std::vector<std::vector<std::complex<double> > > sobel, unsigned log2_N)
+{
+	unsigned N = 1<<log2_N;
+	
+	gfft fft(GPU_FFT_FWD, log2_N);
+	fft.clear();
+	
+	unsigned x, y;
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			fft.input(x, y, in.at(y).at(x));
+		}
+	}
+	
+	fft.execute();
+	
+	gfft ifft(GPU_FFT_REV, log2_N);
+	ifft.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			ifft.input(x, y, fft.output(x, y, false)*sobel.at(y).at(x));
+		}
+	}
+	
+	ifft.execute();
+	
+	std::vector<std::vector<double> > out;
+	
+	for (y=0; y<N; y++) {
+		out.push_back(std::vector<double> ());
+        for (x=0; x<N; x++) {
+			out.at(y).push_back(std::abs(ifft.output(x, y, false)));
+			
+        }
+    }
 	
 	return out;
 }
@@ -96,7 +141,7 @@ std::vector<double> readBMP(std::string filename)
 int main(int argc, char *argv[])
 {
     
-BITMAPFILEHEADER bfh;
+	BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
 	
 	unsigned log2_N = 9;
@@ -123,39 +168,28 @@ BITMAPFILEHEADER bfh;
     bih.biCompression = BI_RGB;
     fwrite(&bih, sizeof(bih), 1, fp);
 	
-	int x, y;
+	unsigned x, y;
 	
-	std::vector<double> lena = readBMP("lena.bmp");
-	
-    gfft fft(GPU_FFT_FWD, log2_N);
-	fft.clear();
-	
-	for(y=0; y<N; y++) {
-		for(x=0; x<N; x++) {
-			fft.input(x, y, lena.at(y*N + x));
-		}
+	std::vector<double> data = readBMP("lena.bmp");
+	std::vector<std::vector<double> > image;
+	for(y=0;y<N;y++) {
+		image.push_back(std::vector<double> ());
+		for(x=0;x<N;x++) {
+			image.at(y).push_back(data.at(y*N+x));
+		}	
 	}
 	
-	fft.execute();
+	std::vector<std::vector<std::complex<double> > > filter = generateSobel(log2_N, true, false);
+	std::vector<std::vector<double> > e = edge(image, filter, log2_N);
 	
-	std::vector<std::vector<std::complex<double> > > sobel = generateSobel(log2_N, true, false);
-	
-	gfft ifft(GPU_FFT_REV, log2_N);
-	ifft.clear();
-	
-	for(y=0; y<N; y++) {
-		for(x=0; x<N; x++) {
-			ifft.input(x, y, fft.output(x, y, false)*sobel.at(y).at(x));
-		}
-	}
-	
-	ifft.execute();
-	
-	char pixel;
+	double temp;
+	unsigned char pixel;
 	
 	for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
-			pixel = (unsigned char) (std::abs(ifft.output(x, y, false))/2);
+			
+			temp = e.at(y).at(x)/1000;
+			pixel = temp>255?(unsigned char)255:(unsigned char)temp;
             fputc(pixel, fp); // blue
             fputc(pixel, fp); // green
             fputc(pixel, fp); // red
