@@ -1,6 +1,3 @@
 [submodule "raspicam"]
 	path = raspicam
 	url = https://github.com/jpts/raspicam
-[submodule "GPIOClass"]
-	path = GPIOClass
-	url = https://github.com/halherta/RaspberryPi-GPIOClass-v2

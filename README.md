@@ -19,22 +19,9 @@ sudo make install
 sudo ldconfig
 ```
 
-## GPIO Setup
-
-Test program build
-
-```
-make testgpio
-sudo ./testGPIO
-```
-
 ## Main Program Build
 
 ```
-make teststill
+make
 sudo ./testStill
 ```
-
-
-
-
