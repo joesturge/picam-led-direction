@@ -26,45 +26,90 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
+#include <cstring>
 #include <unistd.h>
+#include <cmath>
+#include <complex>
+#include <vector>
 
-#include "gpu_fft/gpu_fft_trans.h"
-#include "gpu_fft/mailbox.h"
+#include "gfft.h"
 #include "main.h"
 
-#define log2_N 9
-#define N (1<<log2_N)
-
-#define GPU_FFT_ROW(fft, io, y) ((fft)->io+(fft)->step*(y))
-
-unsigned Microseconds(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return ts.tv_sec*1000000 + ts.tv_nsec/1000;
+std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, bool xy=true, bool shift=false)
+{
+	unsigned N = 1<<log2_N;
+	
+	gfft sobel(GPU_FFT_FWD, log2_N);
+	sobel.clear();
+	
+	double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
+	
+	unsigned x, y, i=0;
+	
+	for(y=0; y<3; y++) {
+		for(x=0; x<3; x++) {
+			sobel.input(x, y, filter[xy ? 1:0][i]);
+			i++;
+		}
+	}
+	
+	sobel.execute();
+	
+	std::vector<std::vector<std::complex<double> > > out;
+	for(y=0; y<N; y++) {
+		out.push_back(std::vector<std::complex<double> >());
+		
+		for(x=0; x<N; x++) {
+			out.at(y).push_back(sobel.output(x, y, shift));
+		}
+	}
+	
+	return out;
 }
 
-int main(int argc, char *argv[]) {
-    int x, y, ret, mb = mbox_open();
-    unsigned t[4];
+std::vector<double> readBMP(std::string filename)
+{
+    int i;
+    FILE* f = fopen(filename.c_str(), "rb");
+    unsigned char info[54];
+    fread(info, sizeof(unsigned char), 54, f); // read the 54-byte header
 
-    struct GPU_FFT_COMPLEX *row;
-    struct GPU_FFT_TRANS *trans;
-    struct GPU_FFT *fft_pass[2];
+    // extract image height and width from header
+    int width = *(int*)&info[18];
+    int height = *(int*)&info[22];
 
-    BITMAPFILEHEADER bfh;
+    int size = 3 * width * height;
+    unsigned char* data = new unsigned char[size]; // allocate 3 bytes per pixel
+	
+    fread(data, sizeof(unsigned char), size, f); // read the rest of the data at once
+    fclose(f);
+	
+	std::vector<double> fdata;
+	
+	for(i=0;i<size;i++) {
+		fdata.push_back((double)data[i]/255);
+	}
+	
+    return fdata;
+}
+
+int main(int argc, char *argv[])
+{
+    
+BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
+	
+	unsigned log2_N = 9;
+	unsigned N = 1<<log2_N;
 
     // Create Windows bitmap file
-    FILE *fp = fopen("hello_fft_2d.bmp", "wb");
+    FILE *fp = fopen("output.bmp", "wb");
     if (!fp) return -666;
 
     // Write bitmap header
     memset(&bfh, 0, sizeof(bfh));
     bfh.bfType = 0x4D42; //"BM"
-    bfh.bfSize = N*N*3;
+    bfh.bfSize = 512*512*3;
     bfh.bfOffBits = sizeof(bfh) + sizeof(bih);
     fwrite(&bfh, sizeof(bfh), 1, fp);
 
@@ -77,60 +122,44 @@ int main(int argc, char *argv[]) {
     bih.biBitCount = 24;
     bih.biCompression = BI_RGB;
     fwrite(&bih, sizeof(bih), 1, fp);
-
-    // Prepare 1st FFT pass
-    ret = gpu_fft_prepare(mb, log2_N, GPU_FFT_FWD, N, fft_pass+0);
-    if (ret) {
-        return ret;
-    }
-    // Prepare 2nd FFT pass
-    ret = gpu_fft_prepare(mb, log2_N, GPU_FFT_FWD, N, fft_pass+1);
-    if (ret) {
-        gpu_fft_release(fft_pass[0]);
-        return ret;
-    }
-    // Transpose from 1st pass output to 2nd pass input
-    ret = gpu_fft_trans_prepare(mb, fft_pass[0], fft_pass[1], &trans);
-    if (ret) {
-        gpu_fft_release(fft_pass[0]);
-        gpu_fft_release(fft_pass[1]);
-        return ret;
-    }
-
-    // Clear input array
-    for (y=0; y<N; y++) {
-        row = GPU_FFT_ROW(fft_pass[0], in, y);
-        for (x=0; x<N; x++) row[x].re = row[x].im = 0;
-    }
-
-    // Setup input data
-    GPU_FFT_ROW(fft_pass[0], in,   N/2)[  N/2].re = 255;
-
-    // ==> FFT() ==> T() ==> FFT() ==>
-    usleep(1); /* yield to OS */   t[0] = Microseconds();
-    gpu_fft_execute(fft_pass[0]);  t[1] = Microseconds();
-    gpu_fft_trans_execute(trans);  t[2] = Microseconds();
-    gpu_fft_execute(fft_pass[1]);  t[3] = Microseconds();
-
-    // Write output to bmp file
-    for (y=0; y<N; y++) {
-        row = GPU_FFT_ROW(fft_pass[1], out, y);
+	
+	int x, y;
+	
+	std::vector<double> lena = readBMP("lena.bmp");
+	
+    gfft fft(GPU_FFT_FWD, log2_N);
+	fft.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			fft.input(x, y, lena.at(y*N + x));
+		}
+	}
+	
+	fft.execute();
+	
+	std::vector<std::vector<std::complex<double> > > sobel = generateSobel(log2_N, true, false);
+	
+	gfft ifft(GPU_FFT_REV, log2_N);
+	ifft.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			ifft.input(x, y, fft.output(x, y, false)*sobel.at(y).at(x));
+		}
+	}
+	
+	ifft.execute();
+	
+	char pixel;
+	
+	for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
-            fputc(128+row[x].re, fp); // blue
-            fputc(128+row[x].re, fp); // green
-            fputc(128+row[x].re, fp); // red
+			pixel = (unsigned char) (std::abs(ifft.output(x, y, false))/2);
+            fputc(pixel, fp); // blue
+            fputc(pixel, fp); // green
+            fputc(pixel, fp); // red
         }
     }
-
-    printf( "1st FFT   %6d usecs\n"
-            "Transpose %6d usecs\n"
-            "2nd FFT   %6d usecs\n",
-            t[3]-t[2], t[2]-t[1], t[1]-t[0]);
-
-    // Clean-up properly.  Videocore memory lost if not freed !
-    gpu_fft_release(fft_pass[0]);
-    gpu_fft_release(fft_pass[1]);
-    gpu_fft_trans_release(trans);
-
     return 0;
 }
