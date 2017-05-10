@@ -23,7 +23,7 @@ H2D = main.h gfft.h motion.h gpu_fft/gpu_fft.h gpu_fft/mailbox.h gpu_fft/gpu_fft
 
 F = -lrt -lm -ldl
 
-default:   $(S) $(C1D) $(H1D)
+default:   $(S) $(C) $(H2D)
 	g++ -o main.bin $(F) $(C2D)
 
 clean:

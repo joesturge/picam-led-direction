@@ -8,6 +8,7 @@
 #include <iostream>
 #include <complex>
 
+#include "gpu_fft/gpu_fft.h"
 #include "gpu_fft/gpu_fft_trans.h"
 #include "gpu_fft/mailbox.h"
 
