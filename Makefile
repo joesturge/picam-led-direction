@@ -1,21 +1,41 @@
+MOTION_PATH=gpu_fft/
+MOTION_FLAGS = -lrt -lm -ldl
+
+GPU_FFT_PATH=gpu_fft/gpu_fft/
+
+SHADERS = $(GPU_FFT_PATH)hex/shader_256.hex \
+    $(GPU_FFT_PATH)hex/shader_512.hex \
+    $(GPU_FFT_PATH)hex/shader_1k.hex \
+    $(GPU_FFT_PATH)hex/shader_2k.hex \
+    $(GPU_FFT_PATH)hex/shader_4k.hex \
+    $(GPU_FFT_PATH)hex/shader_8k.hex \
+    $(GPU_FFT_PATH)hex/shader_16k.hex \
+    $(GPU_FFT_PATH)hex/shader_32k.hex \
+    $(GPU_FFT_PATH)hex/shader_64k.hex \
+    $(GPU_FFT_PATH)hex/shader_128k.hex \
+    $(GPU_FFT_PATH)hex/shader_256k.hex \
+    $(GPU_FFT_PATH)hex/shader_512k.hex \
+    $(GPU_FFT_PATH)hex/shader_1024k.hex \
+    $(GPU_FFT_PATH)hex/shader_2048k.hex \
+    $(GPU_FFT_PATH)hex/shader_4096k.hex \
+    $(GPU_FFT_PATH)hex/shader_trans.hex
+
 CPPFLAGS=-g -fpermissive -Wall -std=c++14 -Irpi_ws281x -Ilib
 CFLAGS=-g -Irpi_ws281x
 LDFLAGS=-g -L/home/pi/bir/lib -Ilib -I/usr/local/include
 CLDFLAGS=-g -Llib -Ilib
-LDLIBS=-lwiringPi -lraspicam -lneopixelring
+LDLIBS=-lwiringPi -lraspicam 
+# -lneopixelring
 
-SRCS=main.cpp
-OBJS=$(subst .cpp,.o,$(SRCS))
-
-CSRCS=rpihw.c pwm.c ws2811.c mailbox.c dma.c
-COBJS=$(subst .c,.o,$(CSRCS))
-
-teststill: main.o neopixelring
+teststill: main.o motion.o
 	$(CXX) $(LDFLAGS) main.o -o testStill $(LDLIBS)
 
 neopixelring: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
 	$(CC) -shared $(CLDFLAGS) -o lib/libneopixelring.so neopixelring.o rpihw.o pwm.o ws2811.o mailbox.o dma.o
 
+motion.o: $(SHADERS) $(MOTION_PATH)gfft.cpp $(MOTION_PATH)motion.cpp $(GPU_FFT_PATH)gpu_fft_trans.c $(GPU_FFT_PATH)mailbox.c $(GPU_FFT_PATH)gpu_fft.c $(GPU_FFT_PATH)gpu_fft_base.c $(GPU_FFT_PATH)gpu_fft_twiddles.c $(GPU_FFT_PATH)gpu_fft_shaders.c
+	$(CXX) -c $(CPPFLAGS) $(MOTION_FLAGS) $(MOTION_PATH)gfft.cpp $(MOTION_PATH)motion.cpp $(GPU_FFT_PATH)gpu_fft_trans.c $(GPU_FFT_PATH)mailbox.c $(GPU_FFT_PATH)gpu_fft.c $(GPU_FFT_PATH)gpu_fft_base.c $(GPU_FFT_PATH)gpu_fft_twiddles.c $(GPU_FFT_PATH)gpu_fft_shaders.c
+	
 main.o: main.cpp
 	$(CXX) -c $(CPPFLAGS) $<
 
@@ -36,6 +56,6 @@ mailbox.o: rpi_ws281x/mailbox.c
 
 dma.o: rpi_ws281x/dma.c
 	$(CC) -c $(CFLAGS) $<
-
+	
 clean:
 	rm *.o
