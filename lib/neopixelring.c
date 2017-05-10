@@ -332,6 +332,7 @@ void neopixelInit() {
   matrix = (ws2811_led_t*)malloc(sizeof(ws2811_led_t) * width * height);
 
   //setup_handlers();
+  initLEDstring();
 
   if ((ret = ws2811_init(&ledstring)) != WS2811_SUCCESS)
   {
@@ -351,7 +352,11 @@ void neopixelUpdate(int led, int red, int blue, int green) {
 
     fprintf(stdout,"updating led %d\n",led);
 
-    ledstring.channel[0].leds[led] =  dotcolors[2];
+    ledstring.channel[0].leds[led] =  dotcolors[1];
+
+    fprintf(stdout,"led val: %x\n",ledstring.channel[0].leds[led]);
+    fprintf(stdout,"gpio sanity: %d\n",ledstring.channel[0].gpionum);
+    fprintf(stdout,"count sanity: %d\n",ledstring.channel[0].count);
 
     ws2811_return_t ret;
     if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
@@ -359,6 +364,39 @@ void neopixelUpdate(int led, int red, int blue, int green) {
         fprintf(stderr,"ws2811_render failed: %s\n",ws2811_get_return_t_str(ret));
         //break;
     }
+}
+
+void neopixelClear(int led) {
+
+    fprintf(stdout,"clearing led %d\n",led);
+
+    ledstring.channel[0].leds[led] =  0x00000000;
+
+    ws2811_return_t ret;
+    if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
+    {
+        fprintf(stderr,"ws2811_render failed: %s\n",ws2811_get_return_t_str(ret));
+        //break;
+    }
+}
+
+void initLEDstring() {
+    ws2811_t init = {
+        .freq = TARGET_FREQ,
+        .dmanum = DMA,
+        .channel =
+        {
+            [0] =
+            {
+                .gpionum = GPIO_PIN,
+                .count = LED_COUNT,
+                .invert = 0,
+                .brightness = 255,
+                .strip_type = STRIP_TYPE,
+            },
+        },
+    };
+    ledstring = init;
 }
 
 /*int main(int argc, char *argv[])
