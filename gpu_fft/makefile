@@ -17,9 +17,9 @@ S = gpu_fft/hex/shader_256.hex \
 
 C = gpu_fft/mailbox.c gpu_fft/gpu_fft.c gpu_fft/gpu_fft_base.c gpu_fft/gpu_fft_twiddles.c gpu_fft/gpu_fft_shaders.c
 
-C2D = $(C) main.cpp gfft.cpp gpu_fft/gpu_fft_trans.c
+C2D = $(C) main.cpp gfft.cpp motion.cpp gpu_fft/gpu_fft_trans.c
 
-H2D = main.h gfft.h gpu_fft/gpu_fft.h gpu_fft/mailbox.h gpu_fft/gpu_fft_trans.h
+H2D = main.h gfft.h motion.h gpu_fft/gpu_fft.h gpu_fft/mailbox.h gpu_fft/gpu_fft_trans.h
 
 F = -lrt -lm -ldl
 

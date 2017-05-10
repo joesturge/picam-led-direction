@@ -3,12 +3,10 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
 #include <unistd.h>
 #include <cmath>
 #include <iostream>
 #include <complex>
-#include <vector>
 
 #include "gpu_fft/gpu_fft_trans.h"
 #include "gpu_fft/mailbox.h"
@@ -37,13 +35,5 @@ class gfft
 
 std::complex<double> toCComplex(GPU_FFT_COMPLEX gpuComplex);
 GPU_FFT_COMPLEX toGComplex(std::complex<double> cComplex);
-std::complex<double> toCComplex(GPU_FFT_COMPLEX gpuComplex);
-GPU_FFT_COMPLEX toGComplex(std::complex<double> cComplex);
 
-std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, bool xy, bool shift);
-
-std::vector<std::vector<std::complex<double> > > edge(std::vector<std::vector<double> > in, std::vector<std::vector<std::complex<double> > > sobel, unsigned log2_N, bool flip);
-
-std::vector<std::vector<std::complex<double> > > convolve(std::vector<std::vector<std::complex<double> > > A, std::vector<std::vector<std::complex<double> > > B, unsigned log2_N);
-
-#endif // GFFT_H
+#endif
