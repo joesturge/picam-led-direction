@@ -51,3 +51,4 @@ typedef struct __attribute__((packed)) {
  */
 
 #  define BI_RGB       0             /* No compression - straight BGR data */
+

@@ -42,17 +42,17 @@ std::vector<std::vector<std::complex<double> > > generateSobel(unsigned log2_N, 
 	gfft sobel(GPU_FFT_FWD, log2_N);
 	sobel.clear();
 	
-	double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
+	//double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
 	
 	//double filter2d[25] = {-1,-2,0,2,1,-2,-4,0,4,2,0,0,0,0,0,2,4,0,-4,-2,1,2,0,-2,-1};
-	//double filterL[9] = {-1,-1,-1,-1,8,-1,-1,-1,-1};
+	double filterL[9] = {-1,-1,-1,-1,8,-1,-1,-1,-1};
 	
 	unsigned x, y, i=0;
 	
 	for(y=0; y<3; y++) {
 		for(x=0; x<3; x++) {
-			sobel.input(x, y, filter[xy ? 1:0][i]);
-			//sobel.input(x, y, filterL[i]);
+			//sobel.input(x, y, filter[xy ? 1:0][i]);
+			sobel.input(x, y, filterL[i]);
 			i++;
 		}
 	}
@@ -105,6 +105,57 @@ std::vector<std::vector<double> > edge(std::vector<std::vector<double> > in, std
 		out.push_back(std::vector<double> ());
         for (x=0; x<N; x++) {
 			out.at(y).push_back(std::abs(ifft.output(x, y, false)));
+			
+        }
+    }
+	
+	return out;
+}
+
+std::vector<std::vector<std::complex<double> > > convolve(std::vector<std::vector<double> > A, std::vector<std::vector<double> > B, unsigned log2_N)
+{
+	unsigned N = 1<<log2_N, x, y;
+	
+	gfft fftA(GPU_FFT_FWD, log2_N);
+	fftA.clear();
+	
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			fftA.input(x, y, A.at(y).at(x));
+		}
+	}
+	
+	fftA.execute();
+	
+	gfft fftB(GPU_FFT_FWD, log2_N);
+	fftB.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			fftB.input(x, y, B.at(y).at(x));
+		}
+	}
+	
+	fftB.execute();
+	
+	gfft ifft(GPU_FFT_REV, log2_N);
+	ifft.clear();
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			ifft.input(x, y, fftA.output(N-x-1, N-y-1, false)*fftB.output(x, y, false));
+		}
+	}
+	
+	ifft.execute();
+	
+	std::vector<std::vector<std::complex<double> > > out;
+	
+	for (y=0; y<N; y++) {
+		out.push_back(std::vector<std::complex<double> > ());
+        for (x=0; x<N; x++) {
+			out.at(y).push_back(ifft.output(x, y, true));
 			
         }
     }
@@ -170,17 +221,32 @@ int main(int argc, char *argv[])
 	
 	unsigned x, y;
 	
-	std::vector<double> data = readBMP("lena.bmp");
-	std::vector<std::vector<double> > image;
+	std::vector<double> data = readBMP("picam.bmp");
+	std::vector<std::vector<double> > imageR;
 	for(y=0;y<N;y++) {
-		image.push_back(std::vector<double> ());
+		imageR.push_back(std::vector<double> ());
 		for(x=0;x<N;x++) {
-			image.at(y).push_back(data.at(y*N+x));
+			imageR.at(y).push_back(data.at(3*(y*N+x)));
 		}	
 	}
 	
+	std::vector<std::vector<double> > imageB;
+	for(y=0;y<N;y++) {
+		imageB.push_back(std::vector<double> ());
+		for(x=0;x<N;x++) {
+			imageB.at(y).push_back(data.at(3*(y*N+x)+2));
+		}	
+	}
+		
 	std::vector<std::vector<std::complex<double> > > filter = generateSobel(log2_N, true, false);
-	std::vector<std::vector<double> > e = edge(image, filter, log2_N);
+	
+	std::cout << "fuck" << std::endl;
+	
+	std::vector<std::vector<double> > edgeA = edge(imageR, filter, log2_N);
+	std::vector<std::vector<double> > edgeB = edge(imageB, filter, log2_N); // make edge output in fft space
+	std::vector<std::vector<std::complex<double> > > convolution = convolve(edgeA, edgeB, log2_N);
+	
+	std::cout << "you" << std::endl;
 	
 	double temp;
 	unsigned char pixel;
@@ -188,12 +254,14 @@ int main(int argc, char *argv[])
 	for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
 			
-			temp = e.at(y).at(x)/1000;
+			temp = std::abs(convolution.at(y).at(x))/std::pow(10, 17);
+			
 			pixel = temp>255?(unsigned char)255:(unsigned char)temp;
             fputc(pixel, fp); // blue
             fputc(pixel, fp); // green
             fputc(pixel, fp); // red
         }
     }
+	
     return 0;
 }
