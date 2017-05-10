@@ -1,7 +1,6 @@
 /*
  * PiCAM Main Project file
  */
-//#include <ctime>
 #include <chrono> //sleeping
 #include <thread> //sleeping
 #include <fstream>
@@ -9,14 +8,14 @@
 #include <unistd.h>
 #include <string>
 #include <raspicam/raspicam.h>
-//#include "GPIOClass.h"
 #include <wiringPi.h>
+#include <sys/stat.h>
 
 using namespace std;
 
 #define RED_LED 6
-#define BLU_LED 13
-#define GRN_LED 19
+#define BLU_LED 19
+#define GRN_LED 13
 
 void msleep(uint t){
 	std::this_thread::sleep_for(std::chrono::milliseconds(t));
@@ -61,38 +60,33 @@ uint looptime;
 uint count;
 
 void ledPulseTime(uint onTime, uint offTime, uint totalTime, int led1, int led2, int led3) {
-	// Make sure we pulse for at least 100ms
-	looptime = ((onTime*2+offTime)/1000);
+	looptime = ((onTime+offTime)*2/1000);
   count = (totalTime/looptime)+1;
 	//cout<<"Doing "<<count<<" loops @ "<<looptime<<"ms each"<<endl;
 
 	for (uint x=0;x<=count;x++)
 	{
 		ledPulse(led1,onTime);
-		led2Pulse(led2,led3,onTime);
+		microsleep(offTime);
+		//led2Pulse(led2,led3,onTime);
+		ledPulse(led3,onTime);
 		microsleep(offTime);
 		//ledPulse(led3,onTime);
 		//microsleep(offTime);
 	}
 }
 
-void flashRGBGrab(raspicam::RaspiCam* cam, int led1, int led2, int led3) {
+
+void flashRGBGrab(raspicam::RaspiCam* cam, int led1, int led2, int led3, uint onTime, uint offTime) {
 	//cout<<"Capturing RGB image"<<endl;
 
-	ledPulseTime(3850,8970,20,led1,led2,led3);
+	ledPulseTime(onTime,offTime,20,led1,led2,led3);
 	if (!cam->grab_dontwait()) {
 		cerr<<"Error grabbing frame"<<endl;
 	}
 	//msleep(5);
-	ledPulseTime(3850,8970,100,led1,led2,led3);
-	//ledPulse100(3000,6993,led1,led2,led3);
-	//ledPulse100(60,139,led1,led2,led3);
-	/*microsleep(10000);
-	ledPulse(led1);
-	microsleep(8970);
-	ledPulse(led2);
-	microsleep(8970);
-	ledPulse(led3);*/
+	ledPulseTime(onTime,offTime,100,led1,led2,led3);
+
 	//msleep(50);
 }
 
@@ -116,8 +110,8 @@ void camInit(raspicam::RaspiCam* Camera) {
 	cout<<"Initing cam"<<endl;
 
 	// override camera settings here
-	Camera->setWidth(320);
-	Camera->setHeight(240);
+	Camera->setWidth(640);
+	Camera->setHeight(480);
 	//	Camera->setShutterSpeed(5000);
 	//Camera->setExposure(raspicam::RASPICAM_EXPOSURE_VERYLONG);
 	//uint tdata = 1;
@@ -146,27 +140,42 @@ void camInit(raspicam::RaspiCam* Camera) {
 }
 
 
-int main ( int argc,char **argv ) {
+int main ( int argc, char **argv ) {
 
 	piHiPri(50); // set high priority
 	gpioInit();
+
+	float duty, freq;
+
+	cout<<"Choose duty & freq"<<endl;
+	cin>>duty;
+	cin>>freq;
+
+	uint onTime = (1000000.0/freq)*duty;
+	uint offTime = (1000000.0/freq)*(1.0-(2*duty))/2.0;
+	cout<<"on/off: "<<onTime<<"/"<<offTime<<endl;
+
 	raspicam::RaspiCam* Camera = new raspicam::RaspiCam;
 	camInit(Camera);
 
 	uint filesize = Camera->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB );
+	struct timespec start, finish, filets;
+	double elapsed;
+	clock_gettime(CLOCK_MONOTONIC, &filets);
+  std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
+	mkdir(base.c_str(),0755);
 
 	for(uint x=0; x<=9; x++) {
-		struct timespec start, finish;
-		double elapsed;
+
 		clock_gettime(CLOCK_MONOTONIC, &start);
-		flashRGBGrab( Camera, RED_LED, GRN_LED, BLU_LED );
+		flashRGBGrab( Camera, RED_LED, GRN_LED, BLU_LED, onTime, offTime);
 		clock_gettime(CLOCK_MONOTONIC, &finish);
 		elapsed = (finish.tv_sec - start.tv_sec);
 		elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
-		std::string fn = "picam-rgb"+std::to_string(x)+".ppm";
-		writeOut( Camera, fn, filesize);
+		std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
+		writeOut( Camera, fn, filesize );
 		//msleep(300);
 	}
 
