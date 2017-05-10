@@ -1,3 +1,6 @@
 [submodule "raspicam"]
 	path = raspicam
-	url = https://github.com/jpts/raspicam
+	url = git@github.com:jpts/raspicam
+[submodule "rpi_ws281x"]
+	path = rpi_ws281x
+	url = https://github.com/jgarff/rpi_ws281x
