@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cmath>
 #include <complex>
 #include <vector>
-
+#include <iostream>
 #include "motion.h"
 #include "main.h"
 
@@ -39,6 +39,7 @@ std::vector<double> readBMP(std::string filename)
 {
     int i;
     FILE* f = fopen(filename.c_str(), "rb");
+    if (!f) {std::cerr<<"File not found"<<std::endl;}
     unsigned char info[54];
     fread(info, sizeof(unsigned char), 54, f); // read the 54-byte header
 
@@ -48,31 +49,33 @@ std::vector<double> readBMP(std::string filename)
 
     int size = 3 * width * height;
     unsigned char* data = new unsigned char[size]; // allocate 3 bytes per pixel
-	
+
     fread(data, sizeof(unsigned char), size, f); // read the rest of the data at once
     fclose(f);
-	
+
 	std::vector<double> fdata;
-	
+
 	for(i=0;i<size;i++) {
 		fdata.push_back((double)data[i]/255);
 	}
-	
+
     return fdata;
 }
 
 int main(int argc, char *argv[])
 {
-    
+
+    std::cout<<"Starting..."<<std::endl;
+
 	BITMAPFILEHEADER bfh;
     BITMAPINFOHEADER bih;
-	
+
 	unsigned log2_N = 9;
 	unsigned N = 1<<log2_N;
 
     // Create Windows bitmap file
     FILE *fp = fopen("output.bmp", "wb");
-    if (!fp) return -666;
+    if (!fp) {std::cout << "filefails"; return -1;}
 
     // Write bitmap header
     memset(&bfh, 0, sizeof(bfh));
@@ -90,38 +93,38 @@ int main(int argc, char *argv[])
     bih.biBitCount = 24;
     bih.biCompression = BI_RGB;
     fwrite(&bih, sizeof(bih), 1, fp);
-	
+
 	unsigned x, y;
-	
+
 	std::vector<double> data = readBMP("picam.bmp");
 	std::vector<std::vector<double> > imageR;
 	for(y=0;y<N;y++) {
 		imageR.push_back(std::vector<double> ());
 		for(x=0;x<N;x++) {
 			imageR.at(y).push_back(data.at(3*(y*N+x)));
-		}	
+		}
 	}
-	
+
 	std::vector<std::vector<double> > imageB;
 	for(y=0;y<N;y++) {
 		imageB.push_back(std::vector<double> ());
 		for(x=0;x<N;x++) {
 			imageB.at(y).push_back(data.at(3*(y*N+x)+2));
-		}	
+		}
 	}
-		
+
 	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
-	
+
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(imageR, filter, log2_N, true);
 	std::vector<std::vector<std::complex<double> > > edgeB = motion::edge(imageB, filter, log2_N, false);
 	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
-	
+
 	double temp;
 	unsigned char pixel;
-	
+
 	for (y=0; y<N; y++) {
         for (x=0; x<N; x++) {
-			
+
 			temp = std::abs(convolution.at(y).at(x))/std::pow(10, 6);
 			pixel = temp>255?(unsigned char)255:(unsigned char)temp;
             fputc(pixel, fp); // blue
@@ -129,6 +132,6 @@ int main(int argc, char *argv[])
             fputc(pixel, fp); // red
         }
     }
-	
+
     return 0;
 }
