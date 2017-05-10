@@ -14,6 +14,7 @@
 #include <vector>
 #include <complex>
 #include "gpu_fft/motion.h"
+#include "gpu_fft/gfft.h"
 
 using namespace std;
 
@@ -204,12 +205,80 @@ void writeOutCrop(raspicam::RaspiCam* cam, std::string filename, uint filesize) 
 	delete data;
 }
 
+void writeOutConvolute(raspicam::RaspiCam* cam, std::string filename, uint filesize, std::vector<std::vector<std::complex<double> > > filter) {
+	unsigned log2_N = 8;
+	unsigned N = 1<<log2_N;
+	
+	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
+	cam->retrieve( data );
+	std::ofstream outFile ( filename.c_str(), std::ios::binary );
+	
+	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
+	
+	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
+	std::vector<std::vector<std::complex<double> > > edgeB = motion::edge(image.at(2), filter, log2_N, false);
+	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
+
+	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
+	
+	unsigned x, y;
+	unsigned char pixel;
+	double temp;
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			temp = std::abs(convolution.at(y).at(x))/std::pow(10, 6);
+			pixel = (unsigned char) temp;
+			
+			outFile.put(pixel);
+			outFile.put(pixel);
+			outFile.put(pixel);
+		}
+	}
+	
+	cout<<"Image saved as "<<filename<<endl;
+	delete data;
+}
+
+std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<std::complex<double> > > filter) {
+	unsigned log2_N = 8;
+	unsigned N = 1<<log2_N;
+	
+	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
+	cam->retrieve( data );
+	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
+	
+	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
+	std::vector<std::vector<std::complex<double> > > edgeB = motion::edge(image.at(2), filter, log2_N, false);
+	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
+	
+	unsigned x, y, xmax=0, ymax=0;
+	double maxValue=0, temp;
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			temp = std::abs(convolution.at(y).at(x));
+			if(temp>maxValue) {
+				maxValue = temp;
+				xmax = x;
+				ymax = y;
+			}
+		}
+	}
+	
+	cout << xmax << " " << ymax << endl;
+	
+	std::complex<double> out((xmax-N/2)/N, (ymax-N/2)/N);
+	return out;
+}
+
 int main ( int argc, char **argv ) {
 
 	piHiPri(50); // set high priority
 	gpioInit();
 
 	float duty, freq;
+	unsigned log2_N = 8;
 
 	cout<<"Choose duty & freq"<<endl;
 	cin>>duty;
@@ -228,6 +297,8 @@ int main ( int argc, char **argv ) {
 	clock_gettime(CLOCK_MONOTONIC, &filets);
     std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
 	mkdir(base.c_str(),0755);
+	
+	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
 
 	for(uint x=0; x<=9; x++) {
 
@@ -239,7 +310,8 @@ int main ( int argc, char **argv ) {
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
 		std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
-		writeOutCrop( Camera, fn, filesize );
+		//writeOutConvolute( Camera, fn, filesize, filter );
+		cout << getMotion( Camera, filter ) << endl;
 		//msleep(300);
 	}
 
