@@ -16,13 +16,15 @@
 #include "gpu_fft/motion.h"
 #include "gpu_fft/gfft.h"
 
+#include "neopixelring.h"
+
 using namespace std;
 
 #define RED_LED 6
 #define BLU_LED 19
 #define GRN_LED 13
 
-void msleep(uint t){
+void millisleep(uint t){
 	std::this_thread::sleep_for(std::chrono::milliseconds(t));
 }
 
@@ -126,11 +128,11 @@ void camInit(raspicam::RaspiCam* Camera) {
 		exit(1);
 	}
 
-	msleep(2000); //2s
+	millisleep(2000); //2s
 	Camera->grab();
-	msleep(100); // 0.1s
+	millisleep(100); // 0.1s
 	Camera->grab();
-	msleep(100); // 0.1s
+	millisleep(100); // 0.1s
 
 	struct timespec start, finish;
 	double elapsed;
@@ -145,22 +147,22 @@ void camInit(raspicam::RaspiCam* Camera) {
 
 std::vector<std::vector<std::vector<double> > > toSquareImage(unsigned char *input, unsigned width, unsigned height, int log2_N) {
 	unsigned N = 1<<log2_N;
-	
+
 	if(N>height || N>width) {
 		cout << "Cannot crop image for convolution. 2^(Log2(N)) must be less than image witdth and height!" << endl;
 		return;
 	}
-	
+
 	unsigned bufferUD = (height-N)/2;
 	unsigned bufferLR = (width-N)/2;
-	
+
 	unsigned startIndex = width*bufferUD*3;
-	
+
 	std::vector<std::vector<std::vector<double> > > out;
 	out.push_back(std::vector<std::vector<double> > ());
 	out.push_back(std::vector<std::vector<double> > ());
 	out.push_back(std::vector<std::vector<double> > ());
-	
+
 	unsigned x, y, i=startIndex;
 	for(y=0;y<N;y++) {
 		out.at(0).push_back(std::vector<double> ());
@@ -174,24 +176,24 @@ std::vector<std::vector<std::vector<double> > > toSquareImage(unsigned char *inp
 		}
 		i += bufferLR*6; // get from right edge of crop to next left edge of crop
 	}
-	
+
 	return out;
-	
+
 }
 
 void writeOutCrop(raspicam::RaspiCam* cam, std::string filename, uint filesize) {
 	unsigned log2_N = 8;
 	unsigned N = 1<<log2_N;
-	
+
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
 	std::ofstream outFile ( filename.c_str(), std::ios::binary );
-	
+
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, 8);
 
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
 	//outFile.write( (char*)data, filesize );
-	
+
 	unsigned x, y;
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
@@ -200,7 +202,7 @@ void writeOutCrop(raspicam::RaspiCam* cam, std::string filename, uint filesize) 
 			outFile.put((unsigned)(image.at(2).at(y).at(x)*255));
 		}
 	}
-	
+
 	cout<<"Image saved as "<<filename<<endl;
 	delete data;
 }
@@ -208,34 +210,34 @@ void writeOutCrop(raspicam::RaspiCam* cam, std::string filename, uint filesize) 
 void writeOutConvolute(raspicam::RaspiCam* cam, std::string filename, uint filesize, std::vector<std::vector<std::complex<double> > > filter) {
 	unsigned log2_N = 8;
 	unsigned N = 1<<log2_N;
-	
+
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
 	std::ofstream outFile ( filename.c_str(), std::ios::binary );
-	
+
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
-	
+
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
 	std::vector<std::vector<std::complex<double> > > edgeB = motion::edge(image.at(2), filter, log2_N, false);
 	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
 
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
-	
+
 	unsigned x, y;
 	unsigned char pixel;
 	double temp;
-	
+
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			temp = std::abs(convolution.at(y).at(x))/std::pow(10, 6);
 			pixel = (unsigned char) temp;
-			
+
 			outFile.put(pixel);
 			outFile.put(pixel);
 			outFile.put(pixel);
 		}
 	}
-	
+
 	cout<<"Image saved as "<<filename<<endl;
 	delete data;
 }
@@ -243,18 +245,18 @@ void writeOutConvolute(raspicam::RaspiCam* cam, std::string filename, uint files
 std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<std::complex<double> > > filter) {
 	unsigned log2_N = 8;
 	unsigned N = 1<<log2_N;
-	
+
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
-	
+
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
 	std::vector<std::vector<std::complex<double> > > edgeB = motion::edge(image.at(2), filter, log2_N, false);
 	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
-	
+
 	unsigned x, y, xmax=0, ymax=0;
 	double maxValue=0, temp;
-	
+
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			temp = std::abs(convolution.at(y).at(x));
@@ -265,9 +267,9 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 			}
 		}
 	}
-	
+
 	cout << xmax << " " << ymax << endl;
-	
+
 	std::complex<double> out((xmax-N/2)/N, (ymax-N/2)/N);
 	return out;
 }
@@ -295,13 +297,21 @@ int main ( int argc, char **argv ) {
 	struct timespec start, finish, filets;
 	double elapsed;
 	clock_gettime(CLOCK_MONOTONIC, &filets);
-    std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
+
+  std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
 	mkdir(base.c_str(),0755);
-	
+
 	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
 
-	for(uint x=0; x<=9; x++) {
-
+	/*neopixelInit();
+	for(uint x=0; x<=11; x++) {
+		neopixelUpdate(x,0,0,0);
+		millisleep(500);
+	}
+	for(uint x=0; x<=11; x++) {
+		neopixelClear(x);
+		millisleep(500);
+	}*/
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		flashRGBGrab( Camera, RED_LED, GRN_LED, BLU_LED, onTime, offTime);
 		clock_gettime(CLOCK_MONOTONIC, &finish);
@@ -310,11 +320,16 @@ int main ( int argc, char **argv ) {
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
 		std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
+
 		//writeOutConvolute( Camera, fn, filesize, filter );
 		cout << getMotion( Camera, filter ) << endl;
-		//msleep(300);
-	}
 
-	cout << "Releasing heap memory and exiting....." << endl;
+		//writeOut( Camera, fn, filesize );*/
+
+		//msleep(300);
+
+
+	//neopixelClose();
+	cout << "Exiting." << endl;
 	return 0;
 }
