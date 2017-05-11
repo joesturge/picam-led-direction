@@ -157,7 +157,7 @@ std::vector<std::vector<std::vector<double> > > toSquareImage(unsigned char *inp
 	unsigned bufferUD = (height-N)/2;
 	unsigned bufferLR = (width-N)/2;
 
-	unsigned startIndex = width*bufferUD*3;
+	unsigned startIndex = width*bufferUD*3+bufferLR;
 
 	std::vector<std::vector<std::vector<double> > > out;
 	out.push_back(std::vector<std::vector<double> > ());
