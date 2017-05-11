@@ -118,6 +118,6 @@ void initLEDstring() {
 }
 
 int _RGBtoHex(uint red, uint green, uint blue) {
-  int total = blue+(green<<8)+(red<<16);
+  int total = blue+(red<<8)+(green<<16);
   return total;
 }
