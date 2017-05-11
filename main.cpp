@@ -251,10 +251,7 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	cam->retrieve( data );
 	std::ofstream outFile ( filename.c_str(), std::ios::binary );
  
-	//outFile<<"P6\n"<<cam->getWidth() <<" "<<cam->getHeight() <<" 255\n";
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
-	//outFile.write( (char*)data, cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB ) );
-	cout<<"Image saved as "<<filename<<endl;
 	
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
 
@@ -265,14 +262,14 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	unsigned x, y, xmax=0, ymax=0;
 	unsigned char pixel;
 	double maxValue=0, temp;
-  uint N_middle_low = (N/2)-10;
+    uint N_middle_low = (N/2)-10;
 	uint N_middle_hi = (N/2)+10;
 
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			temp = std::abs(convolution.at(y).at(x));
 			
-			if(((x>N_middle_low)&&(x<N_middle_hi))&&((y>N_middle_low)&&(y<N_middle_hi))) {
+			if((x>N_middle_low)&&(x<N_middle_hi)&&(y>N_middle_low)&&(y<N_middle_hi)) {
 				temp = 0;
 			}
 			
@@ -287,14 +284,17 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			pixel = (unsigned char) ((std::abs(convolution.at(y).at(x))/maxValue)*127);
+			
+			if((x>N_middle_low)&&(x<N_middle_hi)&&(y>N_middle_low)&&(y<N_middle_hi)) {
+				pixel = 0;
+			}
 
 			outFile.put(pixel);
 			outFile.put(pixel);
 			outFile.put(pixel);
 		}
 	}	
-
-	cout << xmax << " " << ymax << endl;
+	cout<<"Image saved as "<<filename<<endl;
 
 	std::complex<double> out(((double)xmax-(N/2)-1)/N, ((double)ymax-(N/2)-1)/N);
 	delete data;
@@ -309,8 +309,8 @@ void complexToNeoPixel(std::complex<double> cmpl) {
 	float magnitude = std::abs(cmpl);
 	uint color = (magnitude/max_abs)*255;
 	float angle = std::arg(cmpl); // radians
-  uint led_no = ((angle+M_PI)/(2*M_PI))*12;
-	cout<<"raw_mag: "<<magnitude<<" angle: "<<angle<<endl;
+    uint led_no = ((angle+M_PI)/(2*M_PI))*12;
+	//cout<<"raw_mag: "<<magnitude<<" angle: "<<angle<<endl;
 
 	neopixelClear(prev_led_no);
 	neopixelClear(prev_opp_led);
@@ -386,10 +386,10 @@ int main ( int argc, char **argv ) {
 	double elapsed;
 	clock_gettime(CLOCK_MONOTONIC, &filets);
 
-  std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
+    std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
 	mkdir(base.c_str(),0755);
 
-	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
+	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, false, false);
 
 	for(uint i=0; i<=9; i++) {
 
@@ -404,7 +404,7 @@ int main ( int argc, char **argv ) {
 
 		//writeOutConvolute( Camera, fn, filesize, filter );
 		std::complex<double> mVector = getMotion( Camera, filter, fn );
-		//cout<<mVector<<endl;
+		cout<<mVector<<endl;
 		complexToNeoPixel(mVector);
 
 		//writeOut( Camera, fn, filesize );
