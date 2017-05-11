@@ -342,7 +342,7 @@ void complexToNeoPixel(std::complex<double> cmpl) {
 	uint opp_led = led_no + 6;
 	if (opp_led > 11) { opp_led = opp_led - 12; }
     neopixelUpdate(led_no,color,(255-color),0);
-    neopixelUpdate(opp_led,color,(255-color),0);
+    //neopixelUpdate(opp_led,color,(255-color),0);
 	prev_led_no = led_no;
 	prev_opp_led = opp_led;
 }
