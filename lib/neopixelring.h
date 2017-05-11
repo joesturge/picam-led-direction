@@ -28,73 +28,14 @@ extern "C" {
 #endif
 
 ws2811_t ledstring;
-
-
-
+ws2811_return_t ret;
 
 void neopixelInit();
 void neopixelUpdate(int led, int red, int blue, int green);
 void neopixelClose();
 void neopixelClear(int led);
-//void ws2811_render();
-//void ws2811_init();
-//void ws2811_fini();
-//void ws2811_get_return_t_str();
 
-
-
-//ws2811_t ledstring;
-/*ledstring.freq = TARGET_FREQ;
-//ledstring.freq = 6;
-ledstring.dmanum = DMA;
-ledstring.channel[0].gpionum = GPIO_PIN;
-ledstring.channel[0].count = LED_COUNT;
-ledstring.channel[0].invert = 0;
-ledstring.channel[0].brightness = 255;
-ledstring.channel[0].strip_type = STRIP_TYPE;
-ledstring.channel[1].gpionum = 0;
-ledstring.channel[1].count = 0;
-ledstring.channel[1].invert = 0;
-ledstring.channel[1].brightness = 0;*/
-/*ws2811_t ledstring =
-{
-    //"ledstring",
-    .freq = 800000,
-    .dmanum = DMA,
-    .channel =
-    {
-        [0] =
-        {
-            .gpionum = GPIO_PIN,
-            .count = LED_COUNT,
-            .invert = 0,
-            .brightness = 255,
-            .strip_type = STRIP_TYPE,
-        },
-        [1] =
-        {
-            .gpionum = 0,
-            .count = 0,
-            .invert = 0,
-            .brightness = 0,
-        },
-    },
-};*/
-/*ws2811_t ledstring =
-{
-     0,                    // device - set automatically
-     0,                    // rpi_hw - set automatically
-     TARGET_FREQ,          // frequency
-     DMA,                  // DMA num
-     GPIO_PIN,             // GPIO-Pin
-     0,                    // invert
-     LED_COUNT,            // LED count
-     200,                  // brightness
-     STRIP_TYPE,           // strip type
-     0                     // channel
-};*/
-
-//extern struct
+void initLEDstring(void);
 
 ws2811_led_t *matrix;
 
@@ -102,16 +43,6 @@ void matrix_render(void);
 void matrix_rasie(void);
 void matrix_clear(void);
 void matrix_bottom(void);
-void initLEDstring(void);
-
-
-//#ifdef __cplusplus
-//}
-//#endif
-
-//void neopixelInit(void);
-//void neopixelClose(void);
-//void neopixelUpdate(int led, int red, int blue, int green);
 
 #ifdef __cplusplus
 }

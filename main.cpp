@@ -23,6 +23,7 @@ using namespace std;
 #define RED_LED 6
 #define BLU_LED 19
 #define GRN_LED 13
+#define M_PI    3.14159265358979323846
 
 void millisleep(uint t){
 	std::this_thread::sleep_for(std::chrono::milliseconds(t));
@@ -149,8 +150,8 @@ std::vector<std::vector<std::vector<double> > > toSquareImage(unsigned char *inp
 	unsigned N = 1<<log2_N;
 
 	if(N>height || N>width) {
-		cout << "Cannot crop image for convolution. 2^(Log2(N)) must be less than image witdth and height!" << endl;
-		return;
+		cerr << "Cannot crop image for convolution. 2^(Log2(N)) must be less than image witdth and height!" << endl;
+		//return;
 	}
 
 	unsigned bufferUD = (height-N)/2;
@@ -270,21 +271,59 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 
 	cout << xmax << " " << ymax << endl;
 
-	std::complex<double> out((xmax-N/2)/N, (ymax-N/2)/N);
+	std::complex<double> out(((double)xmax-N/2-1)/N, ((double)ymax-N/2-1)/N);
 	return out;
+}
+
+uint prev_led_no;
+
+void complexToNeoPixel(std::complex<double> cmpl) {
+	uint max_abs = 100; // Max magnitude
+	uint magnitude = (std::abs(cmpl)/max_abs)*255;
+	uint angle = std::arg(cmpl); // radians
+  uint led_no = (angle/(2*M_PI))*12;
+
+	neopixelClear(prev_led_no);
+  neopixelUpdate(led_no,magnitude,(255-magnitude),0);
+	prev_led_no = led_no;
+}
+
+void neopixelTest() {
+	for(uint i=0; i<=255; i=i+20) {
+		for(uint x=0; x<=5; x++) {
+			neopixelUpdate(x,i,(255-i),0);
+			neopixelUpdate(x+6,i,(255-i),0);
+			millisleep(50);
+		}
+		for(uint x=0; x<=5; x++) {
+			neopixelClear(x);
+			neopixelClear(x+6);
+			millisleep(50);
+		}
+	}
 }
 
 int main ( int argc, char **argv ) {
 
-	piHiPri(50); // set high priority
+	piHiPri(90); // set high priority
 	gpioInit();
 
 	float duty, freq;
 	unsigned log2_N = 8;
 
-	cout<<"Choose duty & freq"<<endl;
-	cin>>duty;
-	cin>>freq;
+  if (argc == 2) {
+		duty = atof(argv[1]);
+		freq = atof(argv[2]);
+	} else if ((argc == 1)){
+		std::cout << "Using default duty & freq" << '\n';
+		duty = 0.1;
+		freq = 15;
+	}
+	std::cout << "Duty: "<<duty<<" Freq: "<<freq<<std::endl;
+
+	//cout<<"C"<<endl;
+	//cin>>duty;
+	//cin>>freq;
 
 	uint onTime = (1000000.0/freq)*duty;
 	uint offTime = (1000000.0/freq)*(1.0-(2*duty))/2.0;
@@ -293,7 +332,7 @@ int main ( int argc, char **argv ) {
 	raspicam::RaspiCam* Camera = new raspicam::RaspiCam;
 	camInit(Camera);
 
-	uint filesize = Camera->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB );
+	//uint filesize = Camera->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB );
 	struct timespec start, finish, filets;
 	double elapsed;
 	clock_gettime(CLOCK_MONOTONIC, &filets);
@@ -303,15 +342,11 @@ int main ( int argc, char **argv ) {
 
 	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
 
-	/*neopixelInit();
-	for(uint x=0; x<=11; x++) {
-		neopixelUpdate(x,0,0,0);
-		millisleep(500);
-	}
-	for(uint x=0; x<=11; x++) {
-		neopixelClear(x);
-		millisleep(500);
-	}*/
+	neopixelInit();
+	//neopixelTest();
+
+	for(uint i=0; i<=9; i++) {
+
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		flashRGBGrab( Camera, RED_LED, GRN_LED, BLU_LED, onTime, offTime);
 		clock_gettime(CLOCK_MONOTONIC, &finish);
@@ -319,17 +354,18 @@ int main ( int argc, char **argv ) {
 		elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
-		std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
+		//std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
 
 		//writeOutConvolute( Camera, fn, filesize, filter );
-		cout << getMotion( Camera, filter ) << endl;
+		std::complex<double> mVector = getMotion( Camera, filter );
+		complexToNeoPixel(mVector);
 
-		//writeOut( Camera, fn, filesize );*/
+		//writeOut( Camera, fn, filesize );
 
 		//msleep(300);
+  }
 
-
-	//neopixelClose();
+	neopixelClose();
 	cout << "Exiting." << endl;
 	return 0;
 }

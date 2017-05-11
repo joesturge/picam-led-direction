@@ -27,7 +27,7 @@ LDFLAGS=-g -L/home/pi/bir/lib -Ilib -I/usr/local/include
 CLDFLAGS=-g -Llib -Ilib
 LDLIBS=-lwiringPi -lraspicam -lneopixelring
 
-default: main.o $(MOTION_O)
+default: main.o neopixelring $(MOTION_O)
 	$(CXX) $(LDFLAGS) $(MOTION_FLAGS) main.o $(MOTION_O) -o testStill $(LDLIBS)
 
 neopixelring: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
