@@ -285,6 +285,13 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	double maxValue=0, temp;
     uint N_middle_low = (N/2)-10;
 	uint N_middle_hi = (N/2)+10;
+	
+	double middleValue = (std::abs(convolution.at(N/2-1).at(N/2-1))+ \
+	std::abs(convolution.at(N/2-1).at(N/2))+ \
+	std::abs(convolution.at(N/2).at(N/2-1))+ \
+	std::abs(convolution.at(N/2).at(N/2)))/4;
+	
+	bool isMoving = false;
 
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
@@ -294,7 +301,7 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 				temp = 0;
 			}
 
-			if(temp>maxValue) {
+			if(temp>maxValue && temp>middleValue/2) {
 				maxValue = temp;
 				xmax = x;
 				ymax = y;
@@ -320,9 +327,13 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 		}
 	}
 	//cout<<"Image saved as "<<filename<<endl;
-
-	std::complex<double> out(((double)xmax-(N/2)-1)/N, -((double)ymax-(N/2)-1)/N);
 	delete data;
+	
+	if(maxValue == 0) {
+		std::complex<double> out(0,0);
+		return out;
+	}
+	std::complex<double> out(((double)xmax-(N/2)-0.5)/N, -((double)ymax-(N/2)-0.5)/N);
 	return out;
 }
 
