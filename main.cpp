@@ -119,7 +119,7 @@ void camInit(raspicam::RaspiCam* Camera) {
 	// override camera settings here
 	Camera->setWidth(640);
 	Camera->setHeight(480);
-	//	Camera->setShutterSpeed(5000);
+	//Camera->setShutterSpeed(5000);
 	//Camera->setExposure(raspicam::RASPICAM_EXPOSURE_VERYLONG);
 	//uint tdata = 1;
 	//Camera->setUserCallback(&testCB,(void*)&tdata);
@@ -141,7 +141,7 @@ void camInit(raspicam::RaspiCam* Camera) {
 	Camera->grab();
 	clock_gettime(CLOCK_MONOTONIC, &finish);
 	elapsed = (finish.tv_sec - start.tv_sec);
-    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+  elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 	cout<<"grab timing: "<<elapsed<<endl;
 
 }
@@ -257,14 +257,18 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 
 	unsigned x, y, xmax=0, ymax=0;
 	double maxValue=0, temp;
+  uint N_middle_low = (N/2)-10;
+	uint N_middle_hi = (N/2)+10;
 
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
-			temp = std::abs(convolution.at(y).at(x));
-			if(temp>maxValue) {
-				maxValue = temp;
-				xmax = x;
-				ymax = y;
+			if((x < N_middle_low || x > N_middle_hi) && (y < N_middle_low || y > N_middle_hi)) {
+				temp = std::abs(convolution.at(y).at(x));
+				if(temp>maxValue) {
+					maxValue = temp;
+					xmax = x;
+					ymax = y;
+				}
 			}
 		}
 	}
@@ -275,16 +279,18 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	return out;
 }
 
-uint prev_led_no;
+uint prev_led_no = 0;
 
 void complexToNeoPixel(std::complex<double> cmpl) {
-	uint max_abs = 100; // Max magnitude
-	uint magnitude = (std::abs(cmpl)/max_abs)*255;
-	uint angle = std::arg(cmpl); // radians
-  uint led_no = (angle/(2*M_PI))*12;
+	uint max_abs = 1; // Max magnitude
+	float magnitude = std::abs(cmpl);
+	uint color = (magnitude/max_abs)*255;
+	float angle = std::arg(cmpl); // radians
+  uint led_no = ((angle+M_PI)/(2*M_PI))*12;
+	cout<<"raw_mag: "<<magnitude<<" angle: "<<angle<<endl;
 
 	neopixelClear(prev_led_no);
-  neopixelUpdate(led_no,magnitude,(255-magnitude),0);
+  neopixelUpdate(led_no,color,(255-color),0);
 	prev_led_no = led_no;
 }
 
@@ -321,10 +327,6 @@ int main ( int argc, char **argv ) {
 	}
 	std::cout << "Duty: "<<duty<<" Freq: "<<freq<<std::endl;
 
-	//cout<<"C"<<endl;
-	//cin>>duty;
-	//cin>>freq;
-
 	uint onTime = (1000000.0/freq)*duty;
 	uint offTime = (1000000.0/freq)*(1.0-(2*duty))/2.0;
 	cout<<"on/off: "<<onTime<<"/"<<offTime<<endl;
@@ -358,6 +360,7 @@ int main ( int argc, char **argv ) {
 
 		//writeOutConvolute( Camera, fn, filesize, filter );
 		std::complex<double> mVector = getMotion( Camera, filter );
+		//cout<<mVector<<endl;
 		complexToNeoPixel(mVector);
 
 		//writeOut( Camera, fn, filesize );

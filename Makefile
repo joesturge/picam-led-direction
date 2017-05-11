@@ -27,10 +27,10 @@ LDFLAGS=-g -L/home/pi/bir/lib -Ilib -I/usr/local/include
 CLDFLAGS=-g -Llib -Ilib
 LDLIBS=-lwiringPi -lraspicam -lneopixelring
 
-default: main.o neopixelring $(MOTION_O)
+default: main.o libneopixelring.so $(MOTION_O)
 	$(CXX) $(LDFLAGS) $(MOTION_FLAGS) main.o $(MOTION_O) -o testStill $(LDLIBS)
 
-neopixelring: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
+libneopixelring.so: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
 	$(CC) -shared $(CLDFLAGS) -o lib/libneopixelring.so neopixelring.o rpihw.o pwm.o ws2811.o mailbox.o dma.o
 
 motion.o: $(MOTION_PATH)motion.cpp
