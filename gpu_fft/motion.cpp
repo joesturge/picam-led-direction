@@ -9,17 +9,17 @@ namespace motion {
 		gfft sobel(GPU_FFT_FWD, log2_N);
 		sobel.clear();
 		
-		double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
+		//double filter[][9] = {{ -1, 0, 1, -2, 0, 2, -1, 0, 1 } , { 1,  2,  1, 0,  0,  0, -1, -2, -1 }};
 		
 		//double filter2d[25] = {-1,-2,0,2,1,-2,-4,0,4,2,0,0,0,0,0,2,4,0,-4,-2,1,2,0,-2,-1};
-		//double filterL[9] = {-1,-1,-1,-1,8,-1,-1,-1,-1};
+		double filterL[9] = {-1,-1,-1,-1,8,-1,-1,-1,-1};
 		
 		unsigned x, y, i=0;
 		
 		for(y=0; y<3; y++) {
 			for(x=0; x<3; x++) {
-				sobel.input(x, y, filter[xy ? 1:0][i]);
-				//sobel.input(x, y, filterL[i]);
+				//sobel.input(x, y, filter[xy ? 1:0][i]);
+				sobel.input(x, y, filterL[i]);
 				i++;
 			}
 		}

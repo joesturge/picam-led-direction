@@ -249,9 +249,11 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
-	std::ofstream outFile ( filename.c_str(), std::ios::binary );
+	std::ofstream outFile ( (filename+".ppm").c_str(), std::ios::binary );
+	std::ofstream outFile2 ( (filename+"b.ppm").c_str(), std::ios::binary );
  
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
+	outFile2<<"P6\n"<< N <<" "<< N <<" 255\n";
 	
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
 
@@ -292,6 +294,10 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 			outFile.put(pixel);
 			outFile.put(pixel);
 			outFile.put(pixel);
+			
+			outFile2.put(image.at(0).at(y).at(x)*255);
+			outFile2.put(image.at(1).at(y).at(x)*255);
+			outFile2.put(image.at(2).at(y).at(x)*255);
 		}
 	}	
 	cout<<"Image saved as "<<filename<<endl;
@@ -389,7 +395,7 @@ int main ( int argc, char **argv ) {
     std::string base = "pics/set"+std::to_string(int(filets.tv_sec));
 	mkdir(base.c_str(),0755);
 
-	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, false, false);
+	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
 
 	for(uint i=0; i<=9; i++) {
 
@@ -400,7 +406,7 @@ int main ( int argc, char **argv ) {
 		elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
-		std::string fn = base+"/picam-rgb"+std::to_string(i)+".ppm";
+		std::string fn = base+"/picam-rgb"+std::to_string(i);
 
 		//writeOutConvolute( Camera, fn, filesize, filter );
 		std::complex<double> mVector = getMotion( Camera, filter, fn );
