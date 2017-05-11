@@ -321,7 +321,7 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	}
 	//cout<<"Image saved as "<<filename<<endl;
 
-	std::complex<double> out(((double)xmax-(N/2)-1)/N, ((double)ymax-(N/2)-1)/N);
+	std::complex<double> out(((double)xmax-(N/2)-1)/N, -((double)ymax-(N/2)-1)/N);
 	delete data;
 	return out;
 }
@@ -334,7 +334,8 @@ void complexToNeoPixel(std::complex<double> cmpl) {
 	float magnitude = std::abs(cmpl);
 	uint color = (magnitude/max_abs)*255;
 	float angle = std::arg(cmpl); // radians
-    uint led_no = ((angle+M_PI)/(2*M_PI))*12;
+  uint led_no = (((angle+M_PI)/(2*M_PI))*12)-3;
+	if (led_no < 0) { led_no = led_no + 12; }
 	//cout<<"raw_mag: "<<magnitude<<" angle: "<<angle<<endl;
 
 	neopixelClear(prev_led_no);
