@@ -243,12 +243,19 @@ void writeOutConvolute(raspicam::RaspiCam* cam, std::string filename, uint files
 	delete data;
 }
 
-std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<std::complex<double> > > filter) {
+std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<std::complex<double> > > filter, std::string filename) {
 	unsigned log2_N = 8;
 	unsigned N = 1<<log2_N;
 
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
+	std::ofstream outFile ( filename.c_str(), std::ios::binary );
+ 
+	//outFile<<"P6\n"<<cam->getWidth() <<" "<<cam->getHeight() <<" 255\n";
+	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
+	//outFile.write( (char*)data, cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB ) );
+	cout<<"Image saved as "<<filename<<endl;
+	
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
 
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
@@ -256,30 +263,46 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	std::vector<std::vector<std::complex<double> > > convolution = motion::convolve(edgeA, edgeB, log2_N);
 
 	unsigned x, y, xmax=0, ymax=0;
+	unsigned char pixel;
 	double maxValue=0, temp;
   uint N_middle_low = (N/2)-10;
 	uint N_middle_hi = (N/2)+10;
 
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
-			if((x < N_middle_low || x > N_middle_hi) && (y < N_middle_low || y > N_middle_hi)) {
-				temp = std::abs(convolution.at(y).at(x));
-				if(temp>maxValue) {
-					maxValue = temp;
-					xmax = x;
-					ymax = y;
-				}
+			temp = std::abs(convolution.at(y).at(x));
+			
+			if(((x>N_middle_low)&&(x<N_middle_hi))&&((y>N_middle_low)&&(y<N_middle_hi))) {
+				temp = 0;
+			}
+			
+			if(temp>maxValue) {
+				maxValue = temp;
+				xmax = x;
+				ymax = y;
 			}
 		}
 	}
+	
+	for(y=0; y<N; y++) {
+		for(x=0; x<N; x++) {
+			pixel = (unsigned char) ((std::abs(convolution.at(y).at(x))/maxValue)*127);
+
+			outFile.put(pixel);
+			outFile.put(pixel);
+			outFile.put(pixel);
+		}
+	}	
 
 	cout << xmax << " " << ymax << endl;
 
-	std::complex<double> out(((double)xmax-N/2-1)/N, ((double)ymax-N/2-1)/N);
+	std::complex<double> out(((double)xmax-(N/2)-1)/N, ((double)ymax-(N/2)-1)/N);
+	delete data;
 	return out;
 }
 
 uint prev_led_no = 0;
+uint prev_opp_led = 0;
 
 void complexToNeoPixel(std::complex<double> cmpl) {
 	uint max_abs = 1; // Max magnitude
@@ -290,8 +313,28 @@ void complexToNeoPixel(std::complex<double> cmpl) {
 	cout<<"raw_mag: "<<magnitude<<" angle: "<<angle<<endl;
 
 	neopixelClear(prev_led_no);
-  neopixelUpdate(led_no,color,(255-color),0);
+	neopixelClear(prev_opp_led);
+	uint opp_led = led_no + 6;
+	if (opp_led > 11) { opp_led = opp_led - 12; }
+    neopixelUpdate(led_no,color,(255-color),0);
+    neopixelUpdate(opp_led,color,(255-color),0);
 	prev_led_no = led_no;
+	prev_opp_led = opp_led;
+}
+
+void neopixelFlash3Red() {
+	neopixelUpdate(0,200,0,0);
+	millisleep(200);
+	neopixelClear(0);
+	millisleep(100);
+	neopixelUpdate(0,200,0,0);
+	millisleep(200);
+	neopixelClear(0);
+	millisleep(100);
+	neopixelUpdate(0,200,0,0);
+	millisleep(200);
+	neopixelClear(0);
+	millisleep(100);
 }
 
 void neopixelTest() {
@@ -331,6 +374,10 @@ int main ( int argc, char **argv ) {
 	uint offTime = (1000000.0/freq)*(1.0-(2*duty))/2.0;
 	cout<<"on/off: "<<onTime<<"/"<<offTime<<endl;
 
+	neopixelInit();
+	//neopixelTest();
+	neopixelFlash3Red();
+
 	raspicam::RaspiCam* Camera = new raspicam::RaspiCam;
 	camInit(Camera);
 
@@ -344,9 +391,6 @@ int main ( int argc, char **argv ) {
 
 	std::vector<std::vector<std::complex<double> > > filter = motion::generateSobel(log2_N, true, false);
 
-	neopixelInit();
-	//neopixelTest();
-
 	for(uint i=0; i<=9; i++) {
 
 		clock_gettime(CLOCK_MONOTONIC, &start);
@@ -356,18 +400,18 @@ int main ( int argc, char **argv ) {
 		elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 		cout<<"flashRGBGrab timing: "<<elapsed<<endl;
 
-		//std::string fn = base+"/picam-rgb"+std::to_string(x)+".ppm";
+		std::string fn = base+"/picam-rgb"+std::to_string(i)+".ppm";
 
 		//writeOutConvolute( Camera, fn, filesize, filter );
-		std::complex<double> mVector = getMotion( Camera, filter );
+		std::complex<double> mVector = getMotion( Camera, filter, fn );
 		//cout<<mVector<<endl;
 		complexToNeoPixel(mVector);
 
 		//writeOut( Camera, fn, filesize );
 
-		//msleep(300);
   }
 
+	millisleep(1000);
 	neopixelClose();
 	cout << "Exiting." << endl;
 	return 0;
