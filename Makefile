@@ -27,10 +27,10 @@ LDFLAGS=-g -L/home/pi/bir/lib -Ilib -I/usr/local/include
 CLDFLAGS=-g -Llib -Ilib
 LDLIBS=-lwiringPi -lraspicam -lneopixelring
 
-default: main.o libneopixelring.so $(MOTION_O)
+default: main.o lib/libneopixelring.so $(MOTION_O)
 	$(CXX) $(LDFLAGS) $(MOTION_FLAGS) main.o $(MOTION_O) -o testStill $(LDLIBS)
 
-libneopixelring.so: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
+lib/libneopixelring.so: rpihw.o pwm.o ws2811.o mailbox.o dma.o neopixelring.o
 	$(CC) -shared $(CLDFLAGS) -o lib/libneopixelring.so neopixelring.o rpihw.o pwm.o ws2811.o mailbox.o dma.o
 
 motion.o: $(MOTION_PATH)motion.cpp
@@ -78,5 +78,6 @@ mailbox.o: rpi_ws281x/mailbox.c rpi_ws281x/mailbox.h
 dma.o: rpi_ws281x/dma.c rpi_ws281x/dma.h
 	$(CC) -c $(CFLAGS) $<
 
+.PHONY: clean
 clean:
 	rm *.o

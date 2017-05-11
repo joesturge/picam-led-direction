@@ -7,6 +7,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <string>
+#include <signal.h>
 #include <raspicam/raspicam.h>
 #include <wiringPi.h>
 #include <sys/stat.h>
@@ -24,6 +25,23 @@ using namespace std;
 #define BLU_LED 19
 #define GRN_LED 13
 #define M_PI    3.14159265358979323846
+
+static void ctrl_c_handler(int signum)
+{
+		neopixelClose();
+		//Camera->release();
+		cout << "CTL-C Handled." << endl;
+		exit(1);
+}
+
+static void setup_handlers(void)
+{
+    struct sigaction sa;
+		sa.sa_handler = ctrl_c_handler;
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
 
 void millisleep(uint t){
 	std::this_thread::sleep_for(std::chrono::milliseconds(t));
@@ -104,7 +122,7 @@ void writeOut(raspicam::RaspiCam* cam, std::string filename, uint filesize) {
 
 	outFile<<"P6\n"<<cam->getWidth() <<" "<<cam->getHeight() <<" 255\n";
 	outFile.write( (char*)data, filesize );
-	cout<<"Image saved as "<<filename<<endl;
+	//cout<<"Image saved as "<<filename<<endl;
 	delete data;
 }
 
@@ -204,7 +222,7 @@ void writeOutCrop(raspicam::RaspiCam* cam, std::string filename, uint filesize) 
 		}
 	}
 
-	cout<<"Image saved as "<<filename<<endl;
+	//cout<<"Image saved as "<<filename<<endl;
 	delete data;
 }
 
@@ -239,7 +257,7 @@ void writeOutConvolute(raspicam::RaspiCam* cam, std::string filename, uint files
 		}
 	}
 
-	cout<<"Image saved as "<<filename<<endl;
+	//cout<<"Image saved as "<<filename<<endl;
 	delete data;
 }
 
@@ -249,12 +267,19 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
+<<<<<<< HEAD
 	std::ofstream outFile ( (filename+".ppm").c_str(), std::ios::binary );
 	std::ofstream outFile2 ( (filename+"b.ppm").c_str(), std::ios::binary );
  
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
 	outFile2<<"P6\n"<< N <<" "<< N <<" 255\n";
 	
+=======
+	std::ofstream outFile ( filename.c_str(), std::ios::binary );
+
+	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
+
+>>>>>>> Added sig handlers and reduced commenting
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
 
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
@@ -270,11 +295,11 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			temp = std::abs(convolution.at(y).at(x));
-			
+
 			if((x>N_middle_low)&&(x<N_middle_hi)&&(y>N_middle_low)&&(y<N_middle_hi)) {
 				temp = 0;
 			}
-			
+
 			if(temp>maxValue) {
 				maxValue = temp;
 				xmax = x;
@@ -282,11 +307,11 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 			}
 		}
 	}
-	
+
 	for(y=0; y<N; y++) {
 		for(x=0; x<N; x++) {
 			pixel = (unsigned char) ((std::abs(convolution.at(y).at(x))/maxValue)*127);
-			
+
 			if((x>N_middle_low)&&(x<N_middle_hi)&&(y>N_middle_low)&&(y<N_middle_hi)) {
 				pixel = 0;
 			}
@@ -299,8 +324,8 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 			outFile2.put(image.at(1).at(y).at(x)*255);
 			outFile2.put(image.at(2).at(y).at(x)*255);
 		}
-	}	
-	cout<<"Image saved as "<<filename<<endl;
+	}
+	//cout<<"Image saved as "<<filename<<endl;
 
 	std::complex<double> out(((double)xmax-(N/2)-1)/N, ((double)ymax-(N/2)-1)/N);
 	delete data;
@@ -360,6 +385,7 @@ void neopixelTest() {
 
 int main ( int argc, char **argv ) {
 
+	setup_handlers();
 	piHiPri(90); // set high priority
 	gpioInit();
 
@@ -418,6 +444,7 @@ int main ( int argc, char **argv ) {
   }
 
 	millisleep(1000);
+	Camera->release();
 	neopixelClose();
 	cout << "Exiting." << endl;
 	return 0;

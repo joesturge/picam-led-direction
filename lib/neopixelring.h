@@ -1,3 +1,9 @@
+/*
+ * neopixelring.h
+ *
+ * Copyright (c) 2017 James Prance
+ */
+
 #ifndef NEOPIXELRING_H
 #define NEOPIXELRING_H
 

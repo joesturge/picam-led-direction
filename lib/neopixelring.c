@@ -1,8 +1,7 @@
 /*
- * neopixel.c
+ * neopixelring.c
  *
  * Copyright (c) 2017 James Prance
- *
  */
 
 #include <stdint.h>
@@ -78,7 +77,6 @@ void neopixelUpdate(int led, int red, int blue, int green) {
 
     int rgb = _RGBtoHex(red,blue,green);
 
-    fprintf(stdout,"updating led %d with %08x\n",led,rgb);
     ledstring.channel[0].leds[led] =  rgb;
 
     if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
@@ -89,8 +87,6 @@ void neopixelUpdate(int led, int red, int blue, int green) {
 }
 
 void neopixelClear(int led) {
-
-    fprintf(stdout,"clearing led %d\n",led);
 
     ledstring.channel[0].leds[led] =  0x00000000;
 
@@ -122,7 +118,6 @@ void initLEDstring() {
 }
 
 int _RGBtoHex(uint red, uint green, uint blue) {
-  //return sprintf(str,"0x00%02x%02x%02x",red,green,blue);
   int total = blue+(green<<8)+(red<<16);
   return total;
 }
