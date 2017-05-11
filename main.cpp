@@ -267,19 +267,13 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 
 	unsigned char *data = new unsigned char[cam->getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB )];
 	cam->retrieve( data );
-<<<<<<< HEAD
+
 	std::ofstream outFile ( (filename+".ppm").c_str(), std::ios::binary );
 	std::ofstream outFile2 ( (filename+"b.ppm").c_str(), std::ios::binary );
- 
+
 	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
 	outFile2<<"P6\n"<< N <<" "<< N <<" 255\n";
-	
-=======
-	std::ofstream outFile ( filename.c_str(), std::ios::binary );
 
-	outFile<<"P6\n"<< N <<" "<< N <<" 255\n";
-
->>>>>>> Added sig handlers and reduced commenting
 	std::vector<std::vector<std::vector<double> > > image = toSquareImage(data, 640, 480, log2_N);
 
 	std::vector<std::vector<std::complex<double> > > edgeA = motion::edge(image.at(0), filter, log2_N, true);
@@ -319,7 +313,7 @@ std::complex<double> getMotion(raspicam::RaspiCam* cam, std::vector<std::vector<
 			outFile.put(pixel);
 			outFile.put(pixel);
 			outFile.put(pixel);
-			
+
 			outFile2.put(image.at(0).at(y).at(x)*255);
 			outFile2.put(image.at(1).at(y).at(x)*255);
 			outFile2.put(image.at(2).at(y).at(x)*255);
